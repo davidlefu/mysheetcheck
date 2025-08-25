@@ -64,8 +64,8 @@
         width: 100%;
         border-collapse: collapse; /* prevent double borders */
         margin-top: 15px;
-        table-layout: auto;
-        border: 1px solid #333; /* outer border */
+        table-layout: fixed;
+        border: 4px double #1a73e8; /* outer border */
       }
 
       th,
@@ -86,7 +86,7 @@
       /* First column with double right border */
       th:first-child,
       td:first-child {
-        width: 20%;
+        width: 12.5%;
         min-width: 150px;
         border-right: 4px double #1a73e8;
       }
@@ -134,7 +134,7 @@
   </head>
   <body>
     <div class="container">
-      <h1>Google Sheets Data Viewer V2.10</h1>
+      <h1>Google Sheets Data Viewer V2.11</h1>
       <p>
         This application allows authorized users to view data from a private
         Google Sheet.
