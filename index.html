@@ -424,21 +424,31 @@
 
       // Display data as HTML table
       function displayDataAsTable(data) {
-        let tableHtml = "<table>";
-        if (data.length > 0) {
-          tableHtml += "<tr>";
-          for (let i = 0; i < data[0].length; i++) {
-            tableHtml += `<th>Column ${String.fromCharCode(65 + i)}</th>`;
-          }
-          tableHtml += "</tr>";
-        }
-        data.forEach((row) => {
-          tableHtml += "<tr>";
-          row.forEach((cell) => {
-            tableHtml += `<td>${cell || ""}</td>`;
+        let tableHtml = "<table>"; // Check if data exists and has at least one row for headers.
+
+        if (data && data.length > 0) {
+          // Use the first row for headers
+          const headers = data[0];
+          tableHtml += "<thead><tr>";
+          headers.forEach((header) => {
+            tableHtml += `<th>${header || ""}</th>`;
           });
-          tableHtml += "</tr>";
-        });
+          tableHtml += "</tr></thead>"; // Use the rest of the rows for the body
+
+          const bodyRows = data.slice(1);
+          tableHtml += "<tbody>";
+          bodyRows.forEach((row) => {
+            tableHtml += "<tr>";
+            row.forEach((cell) => {
+              tableHtml += `<td>${cell || ""}</td>`;
+            });
+            tableHtml += "</tr>";
+          });
+          tableHtml += "</tbody>";
+        } else {
+          tableHtml += "<tbody><tr><td>No data available.</td></tr></tbody>";
+        }
+
         tableHtml += "</table>";
         dataContainer.innerHTML = tableHtml;
       }
