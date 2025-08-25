@@ -56,12 +56,15 @@
         width: 100%;
         border-collapse: collapse;
         margin-top: 15px;
+        table-layout: auto; /* Ensures columns resize based on content */
       }
       th,
       td {
         padding: 10px;
         text-align: left;
         border: 1px solid #ddd;
+        word-wrap: break-word; /* Allows long words to wrap */
+        max-width: 250px; /* Optional: Sets a max width for cells to prevent overly wide columns */
       }
       th {
         background-color: #f2f2f2;
