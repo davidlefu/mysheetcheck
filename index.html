@@ -7,23 +7,25 @@
     <style>
       body {
         font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-        /* INCREASED MAX-WIDTH */
         max-width: 1200px;
         margin: 0 auto;
         padding: 20px;
         background-color: #f5f8fa;
         color: #333;
       }
+
       .container {
         background-color: white;
         padding: 30px;
         border-radius: 10px;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
       }
+
       h1 {
         color: #1a73e8;
         text-align: center;
       }
+
       button {
         background-color: #1a73e8;
         color: white;
@@ -35,13 +37,16 @@
         margin: 10px 0;
         transition: background-color 0.3s;
       }
+
       button:hover {
         background-color: #0d62c9;
       }
+
       button:disabled {
         background-color: #ccc;
         cursor: not-allowed;
       }
+
       .user-info {
         margin: 20px 0;
         padding: 15px;
@@ -49,43 +54,36 @@
         border-radius: 5px;
         border-left: 4px solid #1a73e8;
       }
+
       .data-container {
         margin-top: 20px;
         overflow-x: auto;
       }
+
       table {
         width: 100%;
-        border-collapse: collapse;
+        border-collapse: collapse; /* prevent double borders */
         margin-top: 15px;
         table-layout: auto;
+        border: 1px solid #333; /* outer border */
       }
+
       th,
       td {
         padding: 10px;
         text-align: left;
-        border: 1px solid #ddd;
+        border: 1px solid #333; /* border for all cells */
         word-wrap: break-word;
       }
 
-      /* NEW: Styles to make the first column wider */
-      th:first-child,
-      td:first-child {
-        width: 20%;
-        min-width: 150px;
-      }
-
+      /* Header row with double bottom border */
       th {
         background-color: #f2f2f2;
         font-weight: bold;
-      }
-      /* NEW: Double line below the header row */
-            th {
-        background-color: #f2f2f2;
-        font-weight: bold;
-        border-bottom: 4px double #1a73e8; /* A thicker, blue double border */
+        border-bottom: 4px double #1a73e8;
       }
 
-      /* NEW: Double line after the first column */
+      /* First column with double right border */
       th:first-child,
       td:first-child {
         width: 20%;
@@ -96,6 +94,7 @@
       tr:nth-child(even) {
         background-color: #f9f9f9;
       }
+
       .error {
         color: #d93025;
         padding: 10px;
@@ -103,6 +102,7 @@
         border-radius: 5px;
         margin: 10px 0;
       }
+
       .success {
         color: #0f9d58;
         padding: 10px;
@@ -110,6 +110,7 @@
         border-radius: 5px;
         margin: 10px 0;
       }
+
       .loading {
         display: inline-block;
         width: 20px;
@@ -119,11 +120,13 @@
         border-top-color: #fff;
         animation: spin 1s ease-in-out infinite;
       }
+
       @keyframes spin {
         to {
           transform: rotate(360deg);
         }
       }
+
       #g_id_onload {
         display: none;
       }
