@@ -133,7 +133,6 @@
       <div id="message" style="display: none"></div>
     </div>
 
-    <!-- Google Identity Services library -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
 
     <script>
@@ -158,20 +157,29 @@
 
       let accessToken = null;
       let currentUser = null;
+      let tokenClient; // NEW: Declare the tokenClient variable here
 
       // Initialize Google Identity Services
       function initializeGIS() {
-        // Set a cookie to help with migration debugging
         document.cookie = "G_AUTH2_MIGRATION=informational; path=/";
 
+        // 1. Initialize the Identity Client for the 'Sign in with Google' button.
+        // This client handles user identity and returns an ID token.
         google.accounts.id.initialize({
           client_id: CLIENT_ID,
           callback: handleCredentialResponse,
           auto_select: false,
           cancel_on_tap_outside: false,
-          // Add the required scope for Google Sheets API
+        });
+
+        // 2. Initialize the OAuth 2.0 Token Client.
+        // This client handles the authorization flow to get an access token.
+        // The required API scopes are specified here.
+        tokenClient = google.accounts.oauth2.initTokenClient({
+          client_id: CLIENT_ID,
           scope:
             "https://www.googleapis.com/auth/spreadsheets.readonly https://www.googleapis.com/auth/drive.readonly",
+          callback: handleAccessTokenResponse, // NEW: Separate callback for the access token
         });
 
         // Render the button
@@ -189,24 +197,10 @@
         checkExistingSession();
       }
 
-      // Handle the credential response from Google
+      // Callback for the ID token (authentication)
       function handleCredentialResponse(response) {
-        console.log("Google auth response received");
-
-        // The access token should be in response.access_token
-        if (response.access_token) {
-          accessToken = response.access_token;
-          console.log("Access token received:", accessToken ? "Yes" : "No");
-        } else {
-          console.error("No access token in response:", response);
-          showMessage(
-            "Authentication failed: No access token received",
-            "error"
-          );
-          return;
-        }
-
-        // Get user info from the credential token
+        console.log("Google ID token received");
+        // We get the user's info from the ID token (credential)
         const payload = parseJwt(response.credential);
         const email = payload.email;
 
@@ -224,18 +218,12 @@
         if (email === "davidlefu@gmail.com") {
           dataSection.style.display = "block";
           showMessage(
-            "You are authorized to access the sheet data.",
+            "You are authorized to view sheet data. Click 'Load' to grant access.",
             "success"
           );
-
-          // Store session in localStorage
+          // Store user identity info, but NOT the access token here
           localStorage.setItem("userEmail", email);
           localStorage.setItem("userName", payload.name);
-          localStorage.setItem("accessToken", accessToken);
-          localStorage.setItem(
-            "tokenExpiry",
-            (Date.now() + 3600000).toString()
-          ); // 1 hour expiry
         } else {
           showMessage(
             "You are logged in but not authorized to view the sheet data.",
@@ -245,13 +233,39 @@
         }
       }
 
+      // NEW: Callback function for the access token response.
+      function handleAccessTokenResponse(tokenResponse) {
+        if (tokenResponse && tokenResponse.access_token) {
+          accessToken = tokenResponse.access_token;
+          console.log(
+            "Access token successfully received:",
+            accessToken ? "Yes" : "No"
+          );
+          // Store the access token and its expiry
+          localStorage.setItem("accessToken", accessToken);
+          localStorage.setItem(
+            "tokenExpiry",
+            (Date.now() + 3599000).toString()
+          ); // 1 hour expiry
+
+          // Now that we have the token, we can proceed with the API call
+          loadSheetDataInternal();
+        } else {
+          console.error("Could not obtain access token:", tokenResponse);
+          showMessage(
+            "Failed to get an access token. Please try again.",
+            "error"
+          );
+          loadingIndicator.style.display = "none";
+        }
+      }
+
       // Check for existing session
       function checkExistingSession() {
         const savedEmail = localStorage.getItem("userEmail");
         const savedToken = localStorage.getItem("accessToken");
         const tokenExpiry = localStorage.getItem("tokenExpiry");
 
-        // Check if token is still valid (not expired)
         if (
           savedEmail === "davidlefu@gmail.com" &&
           savedToken &&
@@ -308,16 +322,36 @@
         showMessage("You have been signed out.", "success");
       }
 
-      // Load data from Google Sheets
-      async function loadSheetData() {
-        if (!accessToken) {
-          showMessage("Please sign in first.", "error");
-          console.error("No access token available");
-          return;
-        }
-
+      // MODIFIED: The function to be called when the button is clicked.
+      // It now checks for a token first.
+      function loadSheetData() {
+        // Start loading UI
         loadingIndicator.style.display = "block";
         dataContainer.innerHTML = "";
+
+        const savedToken = localStorage.getItem("accessToken");
+        const tokenExpiry = localStorage.getItem("tokenExpiry");
+
+        // Check for an existing, non-expired token.
+        if (savedToken && tokenExpiry && Date.now() < parseInt(tokenExpiry)) {
+          accessToken = savedToken;
+          loadSheetDataInternal(); // If token exists, use it directly
+        } else {
+          // If no valid token, request one via the token client.
+          tokenClient.requestAccessToken();
+        }
+      }
+
+      // NEW: The actual API call logic is moved into a new function.
+      async function loadSheetDataInternal() {
+        if (!accessToken) {
+          showMessage(
+            "Authentication failed: No access token available.",
+            "error"
+          );
+          loadingIndicator.style.display = "none";
+          return;
+        }
 
         try {
           console.log(
@@ -338,7 +372,6 @@
           console.log("Sheets API response status:", response.status);
 
           if (response.status === 401) {
-            // Token might be expired or invalid
             showMessage(
               "Authentication expired. Please sign in again.",
               "error"
@@ -373,7 +406,6 @@
           console.error("Error loading data:", error);
           showMessage("Error loading data: " + error.message, "error");
 
-          // If it's an authentication error, suggest re-login
           if (
             error.message.includes("401") ||
             error.message.includes("authentication")
@@ -390,8 +422,6 @@
       // Display data as HTML table
       function displayDataAsTable(data) {
         let tableHtml = "<table>";
-
-        // Add header row
         if (data.length > 0) {
           tableHtml += "<tr>";
           for (let i = 0; i < data[0].length; i++) {
@@ -399,8 +429,6 @@
           }
           tableHtml += "</tr>";
         }
-
-        // Add data rows
         data.forEach((row) => {
           tableHtml += "<tr>";
           row.forEach((cell) => {
@@ -408,7 +436,6 @@
           });
           tableHtml += "</tr>";
         });
-
         tableHtml += "</table>";
         dataContainer.innerHTML = tableHtml;
       }
@@ -418,8 +445,6 @@
         message.textContent = text;
         message.className = type;
         message.style.display = "block";
-
-        // Auto-hide success messages after 5 seconds
         if (type === "success") {
           setTimeout(() => {
             message.style.display = "none";
