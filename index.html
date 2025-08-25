@@ -78,6 +78,21 @@
         background-color: #f2f2f2;
         font-weight: bold;
       }
+      /* NEW: Double line below the header row */
+            th {
+        background-color: #f2f2f2;
+        font-weight: bold;
+        border-bottom: 4px double #1a73e8; /* A thicker, blue double border */
+      }
+
+      /* NEW: Double line after the first column */
+      th:first-child,
+      td:first-child {
+        width: 20%;
+        min-width: 150px;
+        border-right: 4px double #1a73e8;
+      }
+
       tr:nth-child(even) {
         background-color: #f9f9f9;
       }
@@ -116,7 +131,7 @@
   </head>
   <body>
     <div class="container">
-      <h1>Google Sheets Data Viewer V2.7</h1>
+      <h1>Google Sheets Data Viewer V2.8</h1>
       <p>
         This application allows authorized users to view data from a private
         Google Sheet.
