@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OAuth Redirect Handler</title>
+    <style>
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        margin: 0;
+        background-color: #f5f8fa;
+      }
+      .message {
+        text-align: center;
+        padding: 20px;
+        background-color: white;
+        border-radius: 10px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="message">
+      <h2>Authentication Complete</h2>
+      <p>You can close this window and return to the application.</p>
+      <button onclick="window.close()">Close Window</button>
+    </div>
+
+    <script>
+      // Send the authentication result back to the main window
+      if (window.opener) {
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get("code");
+        const error = urlParams.get("error");
+
+        if (error) {
+          window.opener.postMessage(
+            {
+              type: "oauth_error",
+              error: error,
+              error_description: urlParams.get("error_description"),
+            },
+            window.location.origin
+          );
+        } else if (code) {
+          window.opener.postMessage(
+            {
+              type: "oauth_success",
+              code: code,
+            },
+            window.location.origin
+          );
+        }
+      }
+    </script>
+  </body>
+</html>
