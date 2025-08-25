@@ -5,118 +5,118 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Google Sheets Data Viewer</title>
     <style>
-            body {
-              font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-              /* INCREASED MAX-WIDTH */
-              max-width: 1200px;
-              margin: 0 auto;
-              padding: 20px;
-              background-color: #f5f8fa;
-              color: #333;
-            }
-            .container {
-              background-color: white;
-              padding: 30px;
-              border-radius: 10px;
-              box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-            }
-            h1 {
-              color: #1a73e8;
-              text-align: center;
-            }
-            button {
-              background-color: #1a73e8;
-              color: white;
-              border: none;
-              padding: 12px 24px;
-              border-radius: 5px;
-              cursor: pointer;
-              font-size: 16px;
-              margin: 10px 0;
-              transition: background-color 0.3s;
-            }
-            button:hover {
-              background-color: #0d62c9;
-            }
-            button:disabled {
-              background-color: #ccc;
-              cursor: not-allowed;
-            }
-            .user-info {
-              margin: 20px 0;
-              padding: 15px;
-              background-color: #f0f7ff;
-              border-radius: 5px;
-              border-left: 4px solid #1a73e8;
-            }
-            .data-container {
-              margin-top: 20px;
-              overflow-x: auto;
-            }
-            table {
-              width: 100%;
-              border-collapse: collapse;
-              margin-top: 15px;
-              table-layout: auto;
-            }
-            th,
-            td {
-              padding: 10px;
-              text-align: left;
-              border: 1px solid #ddd;
-              word-wrap: break-word;
-            }
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        /* INCREASED MAX-WIDTH */
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: #f5f8fa;
+        color: #333;
+      }
+      .container {
+        background-color: white;
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      }
+      h1 {
+        color: #1a73e8;
+        text-align: center;
+      }
+      button {
+        background-color: #1a73e8;
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 16px;
+        margin: 10px 0;
+        transition: background-color 0.3s;
+      }
+      button:hover {
+        background-color: #0d62c9;
+      }
+      button:disabled {
+        background-color: #ccc;
+        cursor: not-allowed;
+      }
+      .user-info {
+        margin: 20px 0;
+        padding: 15px;
+        background-color: #f0f7ff;
+        border-radius: 5px;
+        border-left: 4px solid #1a73e8;
+      }
+      .data-container {
+        margin-top: 20px;
+        overflow-x: auto;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 15px;
+        table-layout: auto;
+      }
+      th,
+      td {
+        padding: 10px;
+        text-align: left;
+        border: 1px solid #ddd;
+        word-wrap: break-word;
+      }
 
-            /* NEW: Styles to make the first column wider */
-            th:first-child,
-            td:first-child {
-              width: 20%;
-              min-width: 150px;
-            }
+      /* NEW: Styles to make the first column wider */
+      th:first-child,
+      td:first-child {
+        width: 20%;
+        min-width: 150px;
+      }
 
-            th {
-              background-color: #f2f2f2;
-              font-weight: bold;
-            }
-            tr:nth-child(even) {
-              background-color: #f9f9f9;
-            }
-            .error {
-              color: #d93025;
-              padding: 10px;
-              background-color: #fce8e6;
-              border-radius: 5px;
-              margin: 10px 0;
-            }
-            .success {
-              color: #0f9d58;
-              padding: 10px;
-              background-color: #e6f4ea;
-              border-radius: 5px;
-              margin: 10px 0;
-            }
-            .loading {
-              display: inline-block;
-              width: 20px;
-              height: 20px;
-              border: 3px solid rgba(255, 255, 255, 0.3);
-              border-radius: 50%;
-              border-top-color: #fff;
-              animation: spin 1s ease-in-out infinite;
-            }
-            @keyframes spin {
-              to {
-                transform: rotate(360deg);
-              }
-            }
-            #g_id_onload {
-              display: none;
-            }
+      th {
+        background-color: #f2f2f2;
+        font-weight: bold;
+      }
+      tr:nth-child(even) {
+        background-color: #f9f9f9;
+      }
+      .error {
+        color: #d93025;
+        padding: 10px;
+        background-color: #fce8e6;
+        border-radius: 5px;
+        margin: 10px 0;
+      }
+      .success {
+        color: #0f9d58;
+        padding: 10px;
+        background-color: #e6f4ea;
+        border-radius: 5px;
+        margin: 10px 0;
+      }
+      .loading {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 3px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        border-top-color: #fff;
+        animation: spin 1s ease-in-out infinite;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      #g_id_onload {
+        display: none;
+      }
     </style>
   </head>
   <body>
     <div class="container">
-      <h1>Google Sheets Data Viewer V2.6</h1>
+      <h1>Google Sheets Data Viewer V2.7</h1>
       <p>
         This application allows authorized users to view data from a private
         Google Sheet.
