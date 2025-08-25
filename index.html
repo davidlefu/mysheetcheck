@@ -5,7 +5,102 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Google Sheets Data Viewer</title>
     <style>
-      /* ... (keep your existing styles) ... */
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: #f5f8fa;
+        color: #333;
+      }
+      .container {
+        background-color: white;
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      }
+      h1 {
+        color: #1a73e8;
+        text-align: center;
+      }
+      button {
+        background-color: #1a73e8;
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 16px;
+        margin: 10px 0;
+        transition: background-color 0.3s;
+      }
+      button:hover {
+        background-color: #0d62c9;
+      }
+      button:disabled {
+        background-color: #ccc;
+        cursor: not-allowed;
+      }
+      .user-info {
+        margin: 20px 0;
+        padding: 15px;
+        background-color: #f0f7ff;
+        border-radius: 5px;
+        border-left: 4px solid #1a73e8;
+      }
+      .data-container {
+        margin-top: 20px;
+        overflow-x: auto;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 15px;
+      }
+      th,
+      td {
+        padding: 10px;
+        text-align: left;
+        border: 1px solid #ddd;
+      }
+      th {
+        background-color: #f2f2f2;
+        font-weight: bold;
+      }
+      tr:nth-child(even) {
+        background-color: #f9f9f9;
+      }
+      .error {
+        color: #d93025;
+        padding: 10px;
+        background-color: #fce8e6;
+        border-radius: 5px;
+        margin: 10px 0;
+      }
+      .success {
+        color: #0f9d58;
+        padding: 10px;
+        background-color: #e6f4ea;
+        border-radius: 5px;
+        margin: 10px 0;
+      }
+      .loading {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 3px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        border-top-color: #fff;
+        animation: spin 1s ease-in-out infinite;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      #g_id_onload {
+        display: none;
+      }
     </style>
   </head>
   <body>
@@ -43,11 +138,10 @@
 
     <script>
       // Configuration - Replace with your Google OAuth Client ID
-      const CLIENT_ID =
-        "1041756360894-9fqah9862k69mitthrvfa8k8u5n5506f.apps.googleusercontent.com";
+      const CLIENT_ID = "YOUR_GOOGLE_CLIENT_ID";
 
       // Google Sheets information
-      const SPREADSHEET_ID = "1cI3225wGK5q52K_85sEcz4HNdI_bQAeWekkcIGaQarM"; // From your Google Sheet URL
+      const SPREADSHEET_ID = "YOUR_SPREADSHEET_ID"; // From your Google Sheet URL
       const SHEET_NAME = "session check";
       const RANGE = "A2:I13";
 
@@ -64,15 +158,19 @@
       let accessToken = null;
       let currentUser = null;
 
-      // Initialize Google Identity Services with proper scopes
+      // Initialize Google Identity Services
       function initializeGIS() {
+        // Set a cookie to help with migration debugging
+        document.cookie = "G_AUTH2_MIGRATION=informational; path=/";
+
         google.accounts.id.initialize({
           client_id: CLIENT_ID,
           callback: handleCredentialResponse,
           auto_select: false,
           cancel_on_tap_outside: false,
           // Add the required scope for Google Sheets API
-          scope: "https://www.googleapis.com/auth/spreadsheets.readonly",
+          scope:
+            "https://www.googleapis.com/auth/spreadsheets.readonly https://www.googleapis.com/auth/drive.readonly",
         });
 
         // Render the button
@@ -92,8 +190,20 @@
 
       // Handle the credential response from Google
       function handleCredentialResponse(response) {
-        // The access token is now available in response.access_token
-        accessToken = response.access_token;
+        console.log("Google auth response received");
+
+        // The access token should be in response.access_token
+        if (response.access_token) {
+          accessToken = response.access_token;
+          console.log("Access token received:", accessToken ? "Yes" : "No");
+        } else {
+          console.error("No access token in response:", response);
+          showMessage(
+            "Authentication failed: No access token received",
+            "error"
+          );
+          return;
+        }
 
         // Get user info from the credential token
         const payload = parseJwt(response.credential);
@@ -157,10 +267,15 @@
           userInfo.style.display = "block";
           document.getElementById("g_id_signin").style.display = "none";
           dataSection.style.display = "block";
+          showMessage("Welcome back! Your session is still active.", "success");
         } else if (savedToken) {
           // Token expired, clear it
           localStorage.removeItem("accessToken");
           localStorage.removeItem("tokenExpiry");
+          showMessage(
+            "Your session has expired. Please sign in again.",
+            "error"
+          );
         }
       }
 
@@ -169,6 +284,7 @@
         try {
           return JSON.parse(atob(token.split(".")[1]));
         } catch (e) {
+          console.error("Error parsing JWT:", e);
           return null;
         }
       }
@@ -195,6 +311,7 @@
       async function loadSheetData() {
         if (!accessToken) {
           showMessage("Please sign in first.", "error");
+          console.error("No access token available");
           return;
         }
 
@@ -202,7 +319,11 @@
         dataContainer.innerHTML = "";
 
         try {
-          // Use the Sheets API endpoint with proper authentication
+          console.log(
+            "Making request to Sheets API with token:",
+            accessToken ? "Available" : "Missing"
+          );
+
           const response = await fetch(
             `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${SHEET_NAME}!${RANGE}`,
             {
@@ -213,18 +334,28 @@
             }
           );
 
+          console.log("Sheets API response status:", response.status);
+
           if (response.status === 401) {
-            // Token might be expired, try to refresh
-            const refreshed = await refreshToken();
-            if (!refreshed) {
-              throw new Error("Authentication failed. Please sign in again.");
-            }
-            // Retry the request with new token
-            return loadSheetData();
+            // Token might be expired or invalid
+            showMessage(
+              "Authentication expired. Please sign in again.",
+              "error"
+            );
+            localStorage.removeItem("accessToken");
+            localStorage.removeItem("tokenExpiry");
+            handleSignoutClick();
+            return;
           }
 
           if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            const errorData = await response.json();
+            console.error("Sheets API error:", errorData);
+            throw new Error(
+              `HTTP error! status: ${response.status}, message: ${
+                errorData.error?.message || "Unknown error"
+              }`
+            );
           }
 
           const data = await response.json();
@@ -238,8 +369,8 @@
           }
         } catch (error) {
           loadingIndicator.style.display = "none";
+          console.error("Error loading data:", error);
           showMessage("Error loading data: " + error.message, "error");
-          console.error("Error:", error);
 
           // If it's an authentication error, suggest re-login
           if (
@@ -252,23 +383,6 @@
             );
             handleSignoutClick();
           }
-        }
-      }
-
-      // Simple token refresh by re-authenticating
-      async function refreshToken() {
-        try {
-          // Clear stored token and prompt user to sign in again
-          localStorage.removeItem("accessToken");
-          localStorage.removeItem("tokenExpiry");
-          document.getElementById("g_id_signin").style.display = "block";
-          userInfo.style.display = "none";
-          dataSection.style.display = "none";
-          showMessage("Your session expired. Please sign in again.", "error");
-          return false;
-        } catch (error) {
-          console.error("Token refresh failed:", error);
-          return false;
         }
       }
 
