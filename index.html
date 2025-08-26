@@ -135,7 +135,7 @@
   </head>
   <body>
     <div class="container">
-      <h1>Google Sheets Data Viewer V2.14a</h1>
+      <h1>Google Sheets Data Viewer V2.15</h1>
       <p>
         This application allows authorized users to view data from a private
         Google Sheet.
@@ -451,26 +451,35 @@
 
       // Display data as HTML table
       function displayDataAsTable(data) {
-        let tableHtml = "<table>"; // Check if data exists and has at least one row for headers.
+        let tableHtml = "<table>";
 
         if (data && data.length > 0) {
-          // Use the first row for headers
+          // Use the first row as headers
           const headers = data[0];
+          const columnCount = headers.length;
+
           tableHtml += "<thead><tr>";
           headers.forEach((header) => {
             tableHtml += `<th>${header || ""}</th>`;
           });
-          tableHtml += "</tr></thead>"; // Use the rest of the rows for the body
+          tableHtml += "</tr></thead>";
 
-          const bodyRows = data.slice(1);
+          // Body rows
           tableHtml += "<tbody>";
+          const bodyRows = data.slice(1);
+
           bodyRows.forEach((row) => {
             tableHtml += "<tr>";
-            row.forEach((cell) => {
-              tableHtml += `<td>${cell || ""}</td>`;
-            });
+
+            // Pad the row so it always has columnCount cells
+            for (let i = 0; i < columnCount; i++) {
+              const cell = row[i] || "";
+              tableHtml += `<td>${cell}</td>`;
+            }
+
             tableHtml += "</tr>";
           });
+
           tableHtml += "</tbody>";
         } else {
           tableHtml += "<tbody><tr><td>No data available.</td></tr></tbody>";
