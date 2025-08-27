@@ -62,29 +62,27 @@
 
       table {
         width: 100%;
-        border-collapse: collapse; /* prevent double borders */
+        border-collapse: collapse;
         margin-top: 15px;
         table-layout: fixed;
-        border: 3px solid #333; /* outer border */
+        border: 3px solid #333;
       }
 
       th,
       td {
         padding: 10px;
         text-align: left;
-        border: 1px solid #333; /* border for all cells */
+        border: 1px solid #333;
         word-wrap: break-word;
         white-space: pre-wrap;
       }
 
-      /* Header row with double bottom border */
       th {
         background-color: #f2f2f2;
         font-weight: bold;
         border-bottom: 4px double #333;
       }
 
-      /* First column with double right border */
       th:first-child,
       td:first-child {
         width: 12.5%;
@@ -135,14 +133,14 @@
   </head>
   <body>
     <div class="container">
-      <h1>Google Sheets Data Viewer V2.15</h1>
+      <h1>Google Sheets Data Viewer (with Backend Auth) V4.0</h1>
       <p>
         This application allows authorized users to view data from a private
         Google Sheet.
       </p>
 
       <div id="authSection">
-        <div id="g_id_signin" class="custom-gsi-button"></div>
+        <div id="g_id_signin"></div>
         <div id="userInfo" class="user-info" style="display: none">
           <p>Logged in as: <span id="userEmail"></span></p>
           <button id="logoutBtn">Logout</button>
@@ -163,19 +161,13 @@
       <div id="message" style="display: none"></div>
     </div>
 
+    <!-- Google Identity Services -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
 
     <script>
-      // Configuration - Replace with your Google OAuth Client ID
       const CLIENT_ID =
         "1041756360894-9fqah9862k69mitthrvfa8k8u5n5506f.apps.googleusercontent.com";
 
-      // Google Sheets information
-      const SPREADSHEET_ID = "1cI3225wGK5q52K_85sEcz4HNdI_bQAeWekkcIGaQarM"; // From your Google Sheet URL
-      const SHEET_NAME = "session check";
-      const RANGE = "B2:I13";
-
-      // DOM elements
       const userInfo = document.getElementById("userInfo");
       const userEmail = document.getElementById("userEmail");
       const dataSection = document.getElementById("dataSection");
@@ -185,327 +177,145 @@
       const loadingIndicator = document.getElementById("loadingIndicator");
       const logoutBtn = document.getElementById("logoutBtn");
 
-      let accessToken = null;
       let currentUser = null;
-      let tokenClient; // NEW: Declare the tokenClient variable here
+      let idToken = null;
 
-      // Initialize Google Identity Services
+      // Init Google Sign-In
       function initializeGIS() {
-        document.cookie = "G_AUTH2_MIGRATION=informational; path=/";
-
-        // 1. Initialize the Identity Client for the 'Sign in with Google' button.
-        // This client handles user identity and returns an ID token.
         google.accounts.id.initialize({
           client_id: CLIENT_ID,
           callback: handleCredentialResponse,
-          auto_select: false,
-          cancel_on_tap_outside: false,
         });
 
-        // 2. Initialize the OAuth 2.0 Token Client.
-        // This client handles the authorization flow to get an access token.
-        // The required API scopes are specified here.
-        tokenClient = google.accounts.oauth2.initTokenClient({
-          client_id: CLIENT_ID,
-          scope:
-            "https://www.googleapis.com/auth/spreadsheets.readonly https://www.googleapis.com/auth/drive.readonly",
-          callback: handleAccessTokenResponse, // NEW: Separate callback for the access token
-        });
-
-        // Render the button
         google.accounts.id.renderButton(
           document.getElementById("g_id_signin"),
-          {
-            theme: "outline",
-            size: "large",
-            width: 250,
-            text: "signin_with",
-          }
+          { theme: "outline", size: "large", width: 250 }
         );
-
-        // Check if user is already signed in
-        checkExistingSession();
       }
 
-      // Callback for the ID token (authentication)
+      // When user signs in
       function handleCredentialResponse(response) {
-        console.log("Google ID token received");
-        // We get the user's info from the ID token (credential)
-        const payload = parseJwt(response.credential);
-        const email = payload.email;
+        idToken = response.credential;
+        const payload = parseJwt(idToken);
 
-        currentUser = {
-          email: email,
-          name: payload.name,
-          picture: payload.picture,
-        };
-
-        userEmail.textContent = email;
+        currentUser = { email: payload.email, name: payload.name };
+        userEmail.textContent = currentUser.email;
         userInfo.style.display = "block";
         document.getElementById("g_id_signin").style.display = "none";
 
-        // Check if user is authorized (davidlefu@gmail.com)
-        if (email === "davidlefu@gmail.com") {
-          dataSection.style.display = "block";
-          showMessage(
-            "You are authorized to view sheet data. Click 'Load' to grant access.",
-            "success"
-          );
-          // Store user identity info, but NOT the access token here
-          localStorage.setItem("userEmail", email);
-          localStorage.setItem("userName", payload.name);
-        } else {
-          showMessage(
-            "You are logged in but not authorized to view the sheet data.",
-            "error"
-          );
-          handleSignoutClick();
-        }
+        // Show data section only after backend confirms
+        verifyAuthWithBackend();
       }
 
-      // NEW: Callback function for the access token response.
-      function handleAccessTokenResponse(tokenResponse) {
-        if (tokenResponse && tokenResponse.access_token) {
-          accessToken = tokenResponse.access_token;
-          console.log(
-            "Access token successfully received:",
-            accessToken ? "Yes" : "No"
-          );
-          // Store the access token and its expiry
-          localStorage.setItem("accessToken", accessToken);
-          localStorage.setItem(
-            "tokenExpiry",
-            (Date.now() + 3599000).toString()
-          ); // 1 hour expiry
-
-          // Now that we have the token, we can proceed with the API call
-          loadSheetDataInternal();
-        } else {
-          console.error("Could not obtain access token:", tokenResponse);
-          showMessage(
-            "Failed to get an access token. Please try again.",
-            "error"
-          );
-          loadingIndicator.style.display = "none";
-        }
-      }
-
-      // Check for existing session
-      function checkExistingSession() {
-        const savedEmail = localStorage.getItem("userEmail");
-        const savedToken = localStorage.getItem("accessToken");
-        const tokenExpiry = localStorage.getItem("tokenExpiry");
-
-        if (
-          savedEmail === "davidlefu@gmail.com" &&
-          savedToken &&
-          tokenExpiry &&
-          Date.now() < parseInt(tokenExpiry)
-        ) {
-          currentUser = {
-            email: savedEmail,
-            name: localStorage.getItem("userName"),
-          };
-          accessToken = savedToken;
-
-          userEmail.textContent = savedEmail;
-          userInfo.style.display = "block";
-          document.getElementById("g_id_signin").style.display = "none";
-          dataSection.style.display = "block";
-          showMessage("Welcome back! Your session is still active.", "success");
-        } else if (savedToken) {
-          // Token expired, clear it
-          localStorage.removeItem("accessToken");
-          localStorage.removeItem("tokenExpiry");
-          showMessage(
-            "Your session has expired. Please sign in again.",
-            "error"
-          );
-        }
-      }
-
-      // Parse JWT token
-      function parseJwt(token) {
+      async function verifyAuthWithBackend() {
         try {
-          return JSON.parse(atob(token.split(".")[1]));
-        } catch (e) {
-          console.error("Error parsing JWT:", e);
-          return null;
+          const res = await fetch("/api/checkauth", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ idToken }),
+          });
+
+          if (!res.ok) throw new Error("Not authorized");
+          const result = await res.json();
+
+          if (result.authorized) {
+            dataSection.style.display = "block";
+            showMessage(
+              "You are authorized. You can load sheet data.",
+              "success"
+            );
+          } else {
+            showMessage("You are not authorized to view this sheet.", "error");
+            handleSignoutClick();
+          }
+        } catch (err) {
+          console.error("Auth error:", err);
+          showMessage("Authentication failed.", "error");
         }
       }
 
-      // Sign out
-      function handleSignoutClick() {
-        google.accounts.id.disableAutoSelect();
-        localStorage.removeItem("userEmail");
-        localStorage.removeItem("userName");
-        localStorage.removeItem("accessToken");
-        localStorage.removeItem("tokenExpiry");
-
-        userInfo.style.display = "none";
-        dataSection.style.display = "none";
-        document.getElementById("g_id_signin").style.display = "block";
-        dataContainer.innerHTML = "";
-        accessToken = null;
-        currentUser = null;
-
-        showMessage("You have been signed out.", "success");
-      }
-
-      // MODIFIED: The function to be called when the button is clicked.
-      // It now checks for a token first.
-      function loadSheetData() {
-        // Start loading UI
+      // Fetch sheet data via backend
+      async function loadSheetData() {
         loadingIndicator.style.display = "block";
         dataContainer.innerHTML = "";
 
-        const savedToken = localStorage.getItem("accessToken");
-        const tokenExpiry = localStorage.getItem("tokenExpiry");
-
-        // Check for an existing, non-expired token.
-        if (savedToken && tokenExpiry && Date.now() < parseInt(tokenExpiry)) {
-          accessToken = savedToken;
-          loadSheetDataInternal(); // If token exists, use it directly
-        } else {
-          // If no valid token, request one via the token client.
-          tokenClient.requestAccessToken();
-        }
-      }
-
-      // NEW: The actual API call logic is moved into a new function.
-      async function loadSheetDataInternal() {
-        if (!accessToken) {
-          showMessage(
-            "Authentication failed: No access token available.",
-            "error"
-          );
-          loadingIndicator.style.display = "none";
-          return;
-        }
-
         try {
-          console.log(
-            "Making request to Sheets API with token:",
-            accessToken ? "Available" : "Missing"
-          );
+          const res = await fetch("/api/checkauth", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ idToken, action: "getData" }),
+          });
 
-          const response = await fetch(
-            `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${SHEET_NAME}!${RANGE}`,
-            {
-              headers: {
-                Authorization: `Bearer ${accessToken}`,
-                "Content-Type": "application/json",
-              },
-            }
-          );
+          if (!res.ok) throw new Error("Failed to fetch data");
+          const result = await res.json();
 
-          console.log("Sheets API response status:", response.status);
-
-          if (response.status === 401) {
-            showMessage(
-              "Authentication expired. Please sign in again.",
-              "error"
-            );
-            localStorage.removeItem("accessToken");
-            localStorage.removeItem("tokenExpiry");
-            handleSignoutClick();
-            return;
-          }
-
-          if (!response.ok) {
-            const errorData = await response.json();
-            console.error("Sheets API error:", errorData);
-            throw new Error(
-              `HTTP error! status: ${response.status}, message: ${
-                errorData.error?.message || "Unknown error"
-              }`
-            );
-          }
-
-          const data = await response.json();
-          loadingIndicator.style.display = "none";
-
-          if (data.values && data.values.length > 0) {
-            displayDataAsTable(data.values);
+          if (result.values) {
+            displayDataAsTable(result.values);
             showMessage("Data loaded successfully.", "success");
           } else {
             showMessage("No data found.", "error");
           }
-        } catch (error) {
+        } catch (err) {
+          console.error("Error loading data:", err);
+          showMessage("Error loading data: " + err.message, "error");
+        } finally {
           loadingIndicator.style.display = "none";
-          console.error("Error loading data:", error);
-          showMessage("Error loading data: " + error.message, "error");
-
-          if (
-            error.message.includes("401") ||
-            error.message.includes("authentication")
-          ) {
-            showMessage(
-              "Authentication failed. Please sign in again.",
-              "error"
-            );
-            handleSignoutClick();
-          }
         }
       }
 
-      // Display data as HTML table
       function displayDataAsTable(data) {
         let tableHtml = "<table>";
-
         if (data && data.length > 0) {
-          // Use the first row as headers
           const headers = data[0];
-          const columnCount = headers.length;
-
           tableHtml += "<thead><tr>";
-          headers.forEach((header) => {
-            tableHtml += `<th>${header || ""}</th>`;
-          });
-          tableHtml += "</tr></thead>";
+          headers.forEach((h) => (tableHtml += `<th>${h || ""}</th>`));
+          tableHtml += "</tr></thead><tbody>";
 
-          // Body rows
-          tableHtml += "<tbody>";
-          const bodyRows = data.slice(1);
-
-          bodyRows.forEach((row) => {
+          data.slice(1).forEach((row) => {
             tableHtml += "<tr>";
-
-            // Pad the row so it always has columnCount cells
-            for (let i = 0; i < columnCount; i++) {
-              const cell = row[i] || "";
-              tableHtml += `<td>${cell}</td>`;
-            }
-
+            row.forEach((cell) => (tableHtml += `<td>${cell || ""}</td>`));
             tableHtml += "</tr>";
           });
-
           tableHtml += "</tbody>";
         } else {
           tableHtml += "<tbody><tr><td>No data available.</td></tr></tbody>";
         }
-
         tableHtml += "</table>";
         dataContainer.innerHTML = tableHtml;
       }
 
-      // Show message to user
       function showMessage(text, type) {
         message.textContent = text;
         message.className = type;
         message.style.display = "block";
         if (type === "success") {
-          setTimeout(() => {
-            message.style.display = "none";
-          }, 5000);
+          setTimeout(() => (message.style.display = "none"), 5000);
         }
       }
 
-      // Event listeners
+      function parseJwt(token) {
+        try {
+          return JSON.parse(atob(token.split(".")[1]));
+        } catch (e) {
+          console.error("Error parsing JWT:", e);
+          return {};
+        }
+      }
+
+      function handleSignoutClick() {
+        google.accounts.id.disableAutoSelect();
+        currentUser = null;
+        idToken = null;
+        userInfo.style.display = "none";
+        dataSection.style.display = "none";
+        document.getElementById("g_id_signin").style.display = "block";
+        dataContainer.innerHTML = "";
+        showMessage("You have been signed out.", "success");
+      }
+
       loadDataBtn.addEventListener("click", loadSheetData);
       logoutBtn.addEventListener("click", handleSignoutClick);
 
-      // Initialize the application when the page loads
       window.onload = initializeGIS;
     </script>
   </body>
